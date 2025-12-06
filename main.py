@@ -32,21 +32,24 @@ def vytvoreni_tabulky(cursor):
   cursor.execute('''
    CREATE TABLE IF NOT EXISTS UKOLY (
       ID INT AUTO_INCREMENT PRIMARY KEY,
-      NAZEV VARCHAR(255) NOT NULL,
+      NAZEV VARCHAR(255) NOT NULL CHECK (LENGTH(NAZEV) > 0),
       POPIS TEXT NOT NULL,
       STAV VARCHAR(20) NOT NULL,
       DATUM_V DATE NOT NULL
   )''')
 
 def pridat_ukol(cursor):
+
   nazev = input("Zadejte název úkolu: ")
   popis = input("Zadejte popis úkolu: ")
-  stav = "Nezahájeno"
+  stav = "Nezahájeno" 
   datum_v = date.today()
-  
-  sql = "INSERT INTO UKOLY (NAZEV, POPIS, STAV, DATUM_V) VALUES (%s, %s, %s, %s)"
-  val = (nazev, popis, stav, datum_v)
-  cursor.execute(sql, val)
+  if len(nazev) == 0 or len(popis) == 0:
+    print("Název a popis úkolu nesmí být prázdné.")
+    return
+  dtb = "INSERT INTO UKOLY (NAZEV, POPIS, STAV, DATUM_V) VALUES (%s, %s, %s, %s)"
+  hodn = (nazev, popis, stav, datum_v)
+  cursor.execute(dtb, hodn)
   print("Úkol byl úspěšně přidán.")
   
 def ukazat_ukoly(cursor):
@@ -59,7 +62,10 @@ def ukazat_ukoly(cursor):
     return None
 
 def zobrazit_ukoly(cursor):
-  ukazat_ukoly(cursor)
+  stav=ukazat_ukoly(cursor)
+  if stav is None:
+    print("Žádné úkoly nejsou v databázi.")
+    return
   stav_filtr = input("Zadejte stav úkolu pro filtrování (Nezahájeno, Probíhá):")
   if stav_filtr:
     cursor.execute("SELECT * FROM UKOLY WHERE STAV = %s", (stav_filtr,))
@@ -80,9 +86,9 @@ def aktualizovat_ukol(cursor):
     return
   novy_stav = input("Zadejte nový stav úkolu (Probíhá, Dokončeno): ")
   
-  sql = "UPDATE UKOLY SET STAV = %s WHERE ID = %s"
-  val = (novy_stav, id_ukolu)
-  cursor.execute(sql, val)
+  dtb = "UPDATE UKOLY SET STAV = %s WHERE ID = %s"
+  hodn = (novy_stav, id_ukolu)
+  cursor.execute(dtb, hodn)
   print("Úkol byl úspěšně aktualizován.")
 
 def odstranit_ukol(cursor):
@@ -92,9 +98,9 @@ def odstranit_ukol(cursor):
   if id_ukolu is None or id_ukolu == "":
     print("Nesprávné zadání. Zadejte platné ID.")
     return
-  sql = "DELETE FROM UKOLY WHERE ID = %s"
-  val = (id_ukolu,)
-  cursor.execute(sql, val)
+  dtb = "DELETE FROM UKOLY WHERE ID = %s"
+  hodn = (id_ukolu,)
+  cursor.execute(dtb, hodn)
   print("Úkol byl úspěšně odstraněn.")
 
 def main():
