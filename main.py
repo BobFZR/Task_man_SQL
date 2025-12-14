@@ -33,75 +33,115 @@ def vytvoreni_tabulky(cursor):
    CREATE TABLE IF NOT EXISTS UKOLY (
       ID INT AUTO_INCREMENT PRIMARY KEY,
       NAZEV VARCHAR(255) NOT NULL CHECK (LENGTH(NAZEV) > 0),
-      POPIS TEXT NOT NULL,
+      POPIS TEXT NOT NULL CHECK (LENGTH(POPIS) > 0),
       STAV VARCHAR(20) NOT NULL,
       DATUM_V DATE NOT NULL
   )''')
 
-def pridat_ukol(cursor):
+def pridat_ukol_vstupy(cursor):
+    nazev = ""
+    while nazev == "":
+      nazev = input("Zadejte název úkolu: ")
+      if nazev == "":
+        print("Název úkolu nemůže být prázdný.")
+    popis = ""
+    while popis == "":
+      popis = input("Zadejte popis úkolu: ")
+      if popis == "":
+        print("Popis úkolu nemůže být prázdný.")
+    stav = "Nezahájeno" 
+    datum_v = date.today()
+    
+    pridat_ukol(cursor, nazev, popis, stav, datum_v)
 
-  nazev = input("Zadejte název úkolu: ")
-  popis = input("Zadejte popis úkolu: ")
-  stav = "Nezahájeno" 
-  datum_v = date.today()
-  if len(nazev) == 0 or len(popis) == 0:
-    print("Název a popis úkolu nesmí být prázdné.")
-    return
-  dtb = "INSERT INTO UKOLY (NAZEV, POPIS, STAV, DATUM_V) VALUES (%s, %s, %s, %s)"
-  hodn = (nazev, popis, stav, datum_v)
-  cursor.execute(dtb, hodn)
-  print("Úkol byl úspěšně přidán.")
-  
+def pridat_ukol(cursor, nazev, popis, stav, datum_v):
+  try:      
+      dtb = "INSERT INTO UKOLY (NAZEV, POPIS, STAV, DATUM_V) VALUES (%s, %s, %s, %s)"
+      hodn = (nazev, popis, stav, datum_v)
+      cursor.execute(dtb, hodn)
+      print("Úkol byl úspěšně přidán.")
+  except mysql.connector.Error as e:
+      print(f"Nastala chyba při přidávání úkolu: {e}")
+     
+
 def ukazat_ukoly(cursor):
-  cursor.execute("SELECT * FROM UKOLY")
-  result = cursor.fetchall()
-  if result:
-    df = pd.DataFrame(result, columns=['ID', 'Název', 'Popis', 'Stav', 'Datum vytvoření'])
-    print(df)
+  try:
+    cursor.execute("SELECT * FROM UKOLY")
+    result = cursor.fetchall()
+    if result:
+      df = pd.DataFrame(result, columns=['ID', 'Název', 'Popis', 'Stav', 'Datum vytvoření'])
+      print(df)
+  except mysql.connector.Error as e:
+    print(f"Nastala chyba při načítání údajů: {e}")
   else:
     return None
 
+
 def zobrazit_ukoly(cursor):
-  stav=ukazat_ukoly(cursor)
-  if stav is None:
-    print("Žádné úkoly nejsou v databázi.")
-    return
+  
+  ukazat_ukoly(cursor)
+  filtered_result = None
+  
   stav_filtr = input("Zadejte stav úkolu pro filtrování (Nezahájeno, Probíhá):")
-  if stav_filtr:
-    cursor.execute("SELECT * FROM UKOLY WHERE STAV = %s", (stav_filtr,))
-    filtered_result = cursor.fetchall()
-    if filtered_result:
-      df_filtered = pd.DataFrame(filtered_result, columns=['ID', 'Název', 'Popis', 'Stav', 'Datum vytvoření'])
-      print(df_filtered)
-    else:
-      print(f"Žádné úkoly se stavem '{stav_filtr}' k zobrazení.")
+  if stav_filtr == "Nezahájeno" or stav_filtr == "Probíhá":
+      cursor.execute("SELECT * FROM UKOLY WHERE STAV = %s", (stav_filtr,))
+      filtered_result = cursor.fetchall()
+      if filtered_result:
+        df_filtered = pd.DataFrame(filtered_result, columns=['ID', 'Název', 'Popis', 'Stav', 'Datum vytvoření'])
+        print(df_filtered)
+      else:
+        print(f"Žádné úkoly se stavem '{stav_filtr}' k zobrazení.")
+  else:
+       print("Nesprávné zadání podmínky filtru.")
 
-
-def aktualizovat_ukol(cursor):
+def ukol_k_aktualizaci(cursor):
   ukazat_ukoly(cursor)
+  cursor.execute("SELECT ID FROM UKOLY WHERE ID = (SELECT MAX(ID) FROM UKOLY);")
+  maxid = cursor.fetchone()[-1]
+  print(f"Maximální ID úkolu je: {maxid}")
+  id_ukolu = ""
+  while id_ukolu=="" or id_ukolu is None:
+    id_ukolu = input("Zadejte ID úkolu, který chcete aktualizovat: ")
+    if id_ukolu == "":
+      print("Nesprávné zadání. Zadejte platné ID.")
+    elif int(id_ukolu) < 1 or int(id_ukolu) >= maxid:
+      print("Zadané ID neexistuje.")
+      return
+  novy_stav = ""   
+  while novy_stav!="Probíhá" or novy_stav != "Dokončeno":
+    novy_stav = input("Zadejte nový stav úkolu (Probíhá, Dokončeno): ")
+    if novy_stav == "Probíhá" or novy_stav == "Dokončeno":
+      break
+   
+  aktualizovat_ukol(cursor, id_ukolu, novy_stav)  
 
-  id_ukolu = input("Zadejte ID úkolu, který chcete aktualizovat: ")
-  if id_ukolu is None or id_ukolu == "":
-    print("Nesprávné zadání. Zadejte platné ID.")
-    return
-  novy_stav = input("Zadejte nový stav úkolu (Probíhá, Dokončeno): ")
+def aktualizovat_ukol(cursor, id_ukolu, novy_stav):
   
-  dtb = "UPDATE UKOLY SET STAV = %s WHERE ID = %s"
-  hodn = (novy_stav, id_ukolu)
-  cursor.execute(dtb, hodn)
-  print("Úkol byl úspěšně aktualizován.")
+  try:
+    dtb = "UPDATE UKOLY SET STAV = %s WHERE ID = %s"
+    hodn = (novy_stav, id_ukolu)
+    cursor.execute(dtb, hodn)
+    print("Úkol byl úspěšně aktualizován.")
+  except mysql.connector.Error as e:
+    print(f"Nastala chyba při aktualizaci úkolu: {e}")
 
-def odstranit_ukol(cursor):
+def ukol_k_odstraneni(cursor):
   ukazat_ukoly(cursor)
-  
-  id_ukolu = input("Zadejte ID úkolu, který chcete odstranit: ")
-  if id_ukolu is None or id_ukolu == "":
-    print("Nesprávné zadání. Zadejte platné ID.")
-    return
-  dtb = "DELETE FROM UKOLY WHERE ID = %s"
-  hodn = (id_ukolu,)
-  cursor.execute(dtb, hodn)
-  print("Úkol byl úspěšně odstraněn.")
+  id_ukolu = ""
+  while id_ukolu=="" or id_ukolu is None:
+    id_ukolu = input("Zadejte ID úkolu, který chcete odstranit: ")
+    if id_ukolu == "":
+      print("Nesprávné zadání. Zadejte platné ID.")
+  odstranit_ukol(cursor, id_ukolu)
+
+def odstranit_ukol(cursor, id_ukolu):
+  try:  
+    dtb = "DELETE FROM UKOLY WHERE ID = %s"
+    hodn = (id_ukolu,)
+    cursor.execute(dtb, hodn)
+    print("Úkol byl úspěšně odstraněn.")
+  except mysql.connector.Error as e:
+    print(f"Nastala chyba při odstraňování úkolu: {e}")
 
 def main():
 
@@ -110,17 +150,22 @@ def main():
   cursorObject.execute ("CREATE DATABASE IF NOT EXISTS TASK_MAN")
   cursorObject.execute("USE TASK_MAN")
   vytvoreni_tabulky(cursorObject)
+  dataBase.commit()
   volba = hlavni_menu()
 
   while volba != "5":
     if volba == "1":
-      pridat_ukol(cursorObject)
+      pridat_ukol_vstupy(cursorObject)
+      dataBase.commit()
     elif volba == "2":
       zobrazit_ukoly(cursorObject)
+      dataBase.commit()
     elif volba == "3":
-      aktualizovat_ukol(cursorObject)
+      ukol_k_aktualizaci(cursorObject)
+      dataBase.commit()
     elif volba == "4":
-      odstranit_ukol(cursorObject)
+      ukol_k_odstraneni(cursorObject)
+      dataBase.commit()
     else:
       print("Neplatná volba. Zadejte číslo 1-5.")
     volba = hlavni_menu()
